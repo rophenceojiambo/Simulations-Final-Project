@@ -1,0 +1,547 @@
+---
+title: "Obesity_Simulation_Study"
+output: html_document
+date: "2025-07-22"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+obesity <- ObesityDataSet_raw_and_data_sinthetic
+# Load the data
+
+# 1. Check if there are *any* missing values in the entire dataset
+anyNA(obesity)
+
+```
+
+```{r}
+install.packages("tidyverse")
+# Load required packages
+library(tidyverse)
+library(naniar)        # For missing data visualization
+library(GGally)        # For correlation matrix
+library(DataExplorer)  # For automated EDA
+library(ggplot2)
+library(janitor)       # For clean column names
+
+# Load the dataset
+data(obesity.levels)
+obesity <- obesity.levels %>% clean_names()  # optional: clean names to snake_case
+
+```
+
+```{r}
+# Basic structure
+str(obesity)
+
+# Summary of all variables
+summary(obesity)
+
+# Glimpse
+glimpse(obesity)
+
+# Check variable types
+sapply(obesity, class)
+
+```
+
+```{r}
+# Convert character to factor
+obesity <- obesity %>%
+  mutate(across(where(is.character), as.factor))
+
+# Re-check types
+sapply(obesity, class)
+
+```
+
+```{r}
+# Make sure NObeyesdad is a factor
+obesity$NObeyesdad <- as.factor(obesity$NObeyesdad)
+
+# Plot
+ggplot(obesity, aes(x = fct_infreq(NObeyesdad))) +
+  geom_bar(fill = "skyblue") +
+  coord_flip() +
+  labs(
+    title = "Obesity Level Distribution",
+    x = "Obesity Level",
+    y = "Count"
+  ) +
+  theme_minimal()
+
+```
+
+```{r}
+# Histograms of numeric vars
+obesity %>%
+  dplyr::select(where(is.numeric)) %>%
+  pivot_longer(cols = everything()) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(fill = "coral", bins = 30, color = "white") +
+  facet_wrap(~ name, scales = "free") +
+  theme_minimal()
+
+```
+
+```{r}
+# Load libraries
+#install.packages(c("tidyverse", "janitor", "DataExplorer", "GGally", "naniar", "ggthemes"))
+library(tidyverse)
+library(janitor)
+library(DataExplorer)
+library(GGally)
+library(naniar)
+library(ggthemes)
+
+# Step 1: Clean column names (optional but recommended)
+obesity <- obesity %>% clean_names()
+
+# Step 2: Check structure and first few rows
+str(obesity)
+head(obesity)
+
+# Step 3: Plot outcome variable distribution
+obesity$n_obeyesdad <- as.factor(obesity$n_obeyesdad)  # if not already a factor
+
+ggplot(obesity, aes(x = fct_infreq(n_obeyesdad))) +
+  geom_bar(fill = "#4C72B0") +
+  coord_flip() +
+  labs(title = "Obesity Level Distribution", x = "Obesity Category", y = "Count") +
+  theme_minimal()
+
+# Step 4: Categorical variables distribution
+#cat_vars <- obesity %>% select(where(is.character), where(is.factor))
+cat_vars <- c("gender", "family_history_with_overweight", "favc", "caec",
+              "smoke", "scc", "calc", "mtrans", "n_obeyesdad")
+
+
+library(tidyverse)
+library(janitor)
+
+# Frequency tables and percentages for categorical variables
+for (var in cat_vars) {
+  cat("\n============================\n")
+  cat("Variable:", var, "\n\n")
+  
+  freq_tbl <- obesity %>%
+    count(!!sym(var)) %>%
+    mutate(percent = n / sum(n) * 100)
+  
+  print(freq_tbl)
+}
+
+# Bar plots for categorical variables
+for (var in cat_vars) {
+  print(
+    ggplot(obesity, aes_string(x = var)) +
+      geom_bar(fill = "#55A868") +
+      coord_flip() +
+      labs(title = paste("Distribution of", var),
+           x = var,
+           y = "Count") +
+      theme_minimal()
+  )
+}
+
+# Cross-tabulation of each categorical variable with obesity level
+for (var in setdiff(cat_vars, "n_obeyesdad")) {
+  cat("\n============================\n")
+  cat("Cross-tabulation:", var, "vs n_obeyesdad\n\n")
+  
+  tab <- obesity %>%
+    tabyl(!!sym(var), n_obeyesdad) %>%
+    adorn_percentages("row") %>%
+    adorn_pct_formatting(digits = 1) %>%
+    adorn_ns(position = "front")
+  
+  print(tab)
+}
+
+
+
+# Step 5: Numeric variable distributions
+num_vars <- obesity %>% select(where(is.numeric))
+
+num_vars %>%
+  pivot_longer(everything()) %>%
+  ggplot(aes(x = value)) +
+  geom_histogram(fill = "#C44E52", bins = 30, alpha = 0.8) +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal() +
+  labs(title = "Distribution of Numeric Variables", x = "", y = "Frequency")
+
+# Step 6: Boxplots of numeric variables by obesity category
+num_vars_names <- names(num_vars)
+
+for (var in num_vars_names) {
+  print(
+    ggplot(obesity, aes(x = n_obeyesdad, y = .data[[var]], fill = n_obeyesdad)) +
+      geom_boxplot() +
+      labs(title = paste("Boxplot of", var, "by Obesity Category"), x = "", y = var) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      guides(fill = "none")
+  )
+}
+
+# Step 7: Correlation matrix for numeric variables
+cor_matrix <- cor(num_vars, use = "pairwise.complete.obs")
+
+GGally::ggcorr(num_vars, label = TRUE, label_size = 3, hjust = 0.75) +
+  ggtitle("Correlation Matrix of Numeric Variables")
+
+# Step 8: Automated EDA report (optional but helpful)
+create_report(obesity, y = "n_obeyesdad")
+```
+```{r}
+library(tidyverse)
+
+# Make sure your factor variables are factors:
+factor_vars <- c("gender", "family_history_with_overweight", "favc", "caec", "smoke",
+                 "scc", "calc", "mtrans", "n_obeyesdad")
+
+obesity <- obesity %>%
+  mutate(across(all_of(factor_vars), as.factor))
+
+# 1. Obesity level distribution
+ggplot(obesity, aes(x = n_obeyesdad)) +
+  geom_bar(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Distribution of Obesity Levels", x = "Obesity Level", y = "Count") +
+  theme_minimal()
+
+# 2. Categorical variables distribution by obesity level
+cat_vars <- factor_vars[factor_vars != "n_obeyesdad"]
+
+for (var in cat_vars) {
+  print(
+    ggplot(obesity, aes_string(x = var, fill = "n_obeyesdad")) +
+      geom_bar(position = "fill") +
+      labs(title = paste("Proportion of", var, "by Obesity Level"), y = "Proportion") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  )
+}
+
+# 3. Numeric variables distribution by obesity level
+num_vars <- c("age", "fcvc", "ncp", "ch2o", "faf", "tue")
+
+for (var in num_vars) {
+  print(
+    ggplot(obesity, aes_string(x = "n_obeyesdad", y = var)) +
+      geom_boxplot(aes(fill = n_obeyesdad)) +
+      labs(title = paste("Distribution of", var, "by Obesity Level"), x = "Obesity Level", y = var) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      guides(fill = "none")
+  )
+}
+
+```
+```{r}
+library(tidyverse)
+
+# Ensure factor variables are factors
+factor_vars <- c("gender", "family_history_with_overweight", "favc", "caec", "smoke",
+                 "scc", "calc", "mtrans", "n_obeyesdad")
+
+obesity <- obesity %>%
+  mutate(across(all_of(factor_vars), as.factor))
+
+# 1. Obesity level distribution (unchanged)
+ggplot(obesity, aes(x = n_obeyesdad)) +
+  geom_bar(fill = "steelblue") +
+  coord_flip() +
+  labs(title = "Distribution of Obesity Levels", x = "Obesity Level", y = "Count") +
+  theme_minimal()
+
+# 2. Categorical variables side-by-side bar plots by obesity level
+cat_vars <- factor_vars[factor_vars != "n_obeyesdad"]
+
+for (var in cat_vars) {
+  print(
+    ggplot(obesity, aes_string(x = var, fill = "n_obeyesdad")) +
+      geom_bar(position = "dodge") +
+      labs(title = paste("Count of", var, "by Obesity Level"), y = "Count", fill = "Obesity Level") +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  )
+}
+
+# 3. Numeric variables boxplots by obesity level (unchanged)
+num_vars <- c("age", "fcvc", "ncp", "ch2o", "faf", "tue")
+
+for (var in num_vars) {
+  print(
+    ggplot(obesity, aes_string(x = "n_obeyesdad", y = var)) +
+      geom_boxplot(aes(fill = n_obeyesdad)) +
+      labs(title = paste("Distribution of", var, "by Obesity Level"), x = "Obesity Level", y = var) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+      guides(fill = "none")
+  )
+}
+
+```
+```{r}
+library(tidyverse)
+
+# Calculate BMI
+obesity <- obesity %>%
+  mutate(BMI = weight / (height^2))
+
+# Summary of BMI
+summary(obesity$BMI)
+
+# Histogram of BMI
+ggplot(obesity, aes(x = BMI)) +
+  geom_histogram(binwidth = 1, fill = "skyblue", color = "black") +
+  labs(title = "Distribution of BMI", x = "BMI", y = "Count") +
+  theme_minimal()
+
+# Create BMI categories (standard WHO cutoffs)
+obesity <- obesity %>%
+  mutate(BMI_category = case_when(
+    BMI < 18.5 ~ "Underweight",
+    BMI >= 18.5 & BMI < 25 ~ "Normal weight",
+    BMI >= 25 & BMI < 30 ~ "Overweight",
+    BMI >= 30 ~ "Obese",
+    TRUE ~ NA_character_
+  )) %>%
+  mutate(BMI_category = factor(BMI_category, levels = c("Underweight", "Normal weight", "Overweight", "Obese")))
+
+# Bar plot of BMI categories
+ggplot(obesity, aes(x = BMI_category)) +
+  geom_bar(fill = "coral") +
+  labs(title = "BMI Category Distribution", x = "BMI Category", y = "Count") +
+  theme_minimal()
+
+# Boxplot of BMI by obesity level
+ggplot(obesity, aes(x = n_obeyesdad, y = BMI)) +
+  geom_boxplot(aes(fill = n_obeyesdad)) +
+  labs(title = "BMI by Obesity Level", x = "Obesity Level", y = "BMI") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  guides(fill = "none")
+library(ggplot2)
+
+ggplot(obesity, aes(x = age, y = BMI, color = n_obeyesdad)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "loess", se = FALSE) +   # Adds a smooth trend line per obesity level
+  labs(
+    title = "BMI vs Age by Obesity Level",
+    x = "Age (years)",
+    y = "BMI",
+    color = "Obesity Level"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+```{r}
+library(ggplot2)
+library(dplyr)
+library(forcats)
+#1. Distribution and Comparison of Eating Habits by Obesity Level
+
+# Select categorical eating habit vars
+eating_vars <- c("favc", "caec", "calc")
+
+# Convert to factors (if not already)
+obesity[eating_vars] <- lapply(obesity[eating_vars], factor)
+
+# Bar plots stratified by obesity level
+for (var in eating_vars) {
+  print(
+    ggplot(obesity, aes_string(x = var, fill = "n_obeyesdad")) +
+      geom_bar(position = "dodge") +
+      labs(title = paste("Distribution of", var, "by Obesity Level"),
+           x = var, fill = "Obesity Level") +
+      theme_minimal()
+  )
+}
+
+# Chi-square test for each variable with obesity level
+for (var in eating_vars) {
+  tbl <- table(obesity[[var]], obesity$n_obeyesdad)
+  cat("Chi-square test for", var, "by Obesity Level:\n")
+  print(chisq.test(tbl))
+  cat("\n-------------------------\n")
+}
+
+```
+
+```{r}
+# Boxplots of FAF and TUE by obesity level
+num_vars <- c("faf", "tue")
+
+for (var in num_vars) {
+  print(
+    ggplot(obesity, aes_string(x = "n_obeyesdad", y = var)) +
+      geom_boxplot(fill = "lightblue") +
+      labs(title = paste("Distribution of", var, "by Obesity Level"),
+           x = "Obesity Level", y = var) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  )
+}
+
+# Correlation/regression adjusting for age and gender
+library(broom)
+
+
+library(MASS)
+
+model_faf <- polr(n_obeyesdad ~ faf + age + gender, data = obesity, Hess=TRUE)
+summary(model_faf)
+
+# Example: Linear regression TUE ~ Obesity + Age + Gender
+model_tue <- polr(n_obeyesdad ~  tue + age + gender, data = obesity, Hess=TRUE)
+summary(model_tue)
+
+```
+```{r}
+# Bar plots of family history and smoking by obesity
+cat_vars <- c("family_history_with_overweight", "smoke")
+
+for (var in cat_vars) {
+  print(
+    ggplot(obesity, aes_string(x = var, fill = "n_obeyesdad")) +
+      geom_bar(position = "dodge") +
+      labs(title = paste("Distribution of", var, "by Obesity Level"),
+           x = var, fill = "Obesity Level") +
+      theme_minimal()
+  )
+}
+
+# Logistic regression for odds of obesity (binary outcome example)
+# Create binary outcome: obese (levels with "Obesity") vs not
+obesity$obese_binary <- ifelse(grepl("Obesity", obesity$n_obeyesdad), 1, 0)
+
+# Model family history
+model_fam <- glm(obese_binary ~ family_history_with_overweight + age + gender,
+                 data = obesity, family = binomial)
+summary(model_fam)
+
+# Model smoking
+model_smoke <- glm(obese_binary ~ smoke + age + gender,
+                   data = obesity, family = binomial)
+summary(model_smoke)
+
+```
+
+
+```{r}
+install.packages("interactions")  # run this once if not installed
+library(interactions)
+
+model <- lm(BMI ~ faf * gender, data = obesity)
+
+interact_plot(model, pred = faf, modx = gender, plot.points = TRUE) +
+  labs(title = "Interaction of Physical Activity and Gender on BMI")
+
+```
+
+```{r}
+library(dplyr)
+
+# --- MCAR: Missing Completely at Random ---
+introduce_mcar <- function(data, var, prop_missing) {
+  df <- data
+  n <- nrow(df)
+  missing_indices <- sample(1:n, size = floor(prop_missing * n), replace = FALSE)
+  df[missing_indices, var] <- NA
+  return(df)
+}
+
+# --- MAR: Missing At Random ---
+# Missingness in 'var' depends on observed 'dep_var' satisfying a condition
+introduce_mar <- function(data, var, dep_var, condition_func, prop_missing) {
+  df <- data
+  eligible <- which(condition_func(df[[dep_var]]))
+  n_miss <- floor(prop_missing * length(eligible))
+  if (n_miss == 0) return(df)
+  missing_indices <- sample(eligible, size = n_miss, replace = FALSE)
+  df[missing_indices, var] <- NA
+  return(df)
+}
+
+# --- MNAR: Missing Not At Random ---
+# Missingness depends on 'var' values themselves (e.g. only for some levels/values)
+introduce_mnar <- function(data, var, missing_values, prop_missing) {
+  df <- data
+  eligible <- which(df[[var]] %in% missing_values)
+  n_miss <- floor(prop_missing * length(eligible))
+  if (n_miss == 0) return(df)
+  missing_indices <- sample(eligible, size = n_miss, replace = FALSE)
+  df[missing_indices, var] <- NA
+  return(df)
+}
+
+# MCAR: 15% missing completely at random in 'favc'
+obesity_mcar <- introduce_mcar(obesity, var = "favc", prop_missing = 0.15)
+
+# MAR: Missing 'fcvc' values where age > 30 (30% missing among those)
+obesity_mar <- introduce_mar(obesity, var = "fcvc", dep_var = "age",
+                            condition_func = function(x) x > 30,
+                            prop_missing = 0.3)
+
+# MNAR: Missing 'favc' only for 'yes' values, 40% missingness within that group
+obesity_mnar <- introduce_mnar(obesity, var = "favc", missing_values = "yes", prop_missing = 0.4)
+
+```
+
+```{r}
+introduce_missing_multiple <- function(data, missing_plan) {
+  df <- data
+  for (plan in missing_plan) {
+    var <- plan$var
+    mech <- plan$mechanism
+    prop <- plan$prop_missing
+    
+    if (mech == "MCAR") {
+      n <- nrow(df)
+      missing_indices <- sample(1:n, size = floor(prop * n), replace = FALSE)
+      df[missing_indices, var] <- NA
+      
+    } else if (mech == "MAR") {
+      dep_var <- plan$dep_var
+      condition_func <- plan$condition_func
+      eligible <- which(condition_func(df[[dep_var]]))
+      n_miss <- floor(prop * length(eligible))
+      if (n_miss > 0) {
+        missing_indices <- sample(eligible, size = n_miss, replace = FALSE)
+        df[missing_indices, var] <- NA
+      }
+      
+    } else if (mech == "MNAR") {
+      missing_values <- plan$missing_values
+      eligible <- which(df[[var]] %in% missing_values)
+      n_miss <- floor(prop * length(eligible))
+      if (n_miss > 0) {
+        missing_indices <- sample(eligible, size = n_miss, replace = FALSE)
+        df[missing_indices, var] <- NA
+      }
+      
+    } else {
+      stop("Unknown missingness mechanism")
+    }
+  }
+  return(df)
+}
+missing_plan <- list(
+  list(var = "favc", mechanism = "MCAR", prop_missing = 0.15),
+  list(var = "fcvc", mechanism = "MAR", prop_missing = 0.25, 
+       dep_var = "age", condition_func = function(x) x > 30),
+  list(var = "family_history_with_overweight", mechanism = "MNAR", prop_missing = 0.3,
+       missing_values = "yes")
+)
+
+obesity_missing <- introduce_missing_multiple(obesity, missing_plan)
+
+```
+
