@@ -1,0 +1,440 @@
+---
+title: "Evaluating Missing Data Handling Techniques Under Different Missingness Mechanisms"
+author: 
+- Rophence Ojiambo
+- Kiran Nagdeo
+- Cindy Patippe
+geometry: top=1.54cm, bottom=1.94cm, left=1.54cm, right=1.54cm
+format:
+  pdf:
+    include-in-header:
+      text: |
+        \usepackage{amsmath} 
+        \usepackage{fvextra}
+        \usepackage{pdflscape}     
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+        \DefineVerbatimEnvironment{OutputCode}{Verbatim}{breaklines,commandchars=\\\{\}}
+link-citations: true
+colorlinks: true
+linkcolor: blue
+urlcolor: blue
+bibliography: references.bib
+csl: apa-numeric-superscript-brackets.csl
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE, 
+                      dpi = 300)
+```
+
+
+# Introduction
+
+```{r}
+# ===============================
+# Load Required Libraries
+# ===============================
+library(mice)        # For multiple imputation by chained equations (MICE)
+library(doParallel)  # For parallel processing (if needed later)
+library(foreach)     # For parallel looping
+library(purrr)       # For functional programming (e.g., map)
+library(fairml)      # For accessing the `obesity.levels` dataset
+library(naniar)
+library(misty)
+library(mvnmle)
+library(ggplot2)
+library(tidyverse)
+```
+
+
+```{r}
+# ==============================================================================
+# Load and Prepare the Dataset
+# ==============================================================================
+
+data(obesity.levels)  # Load dataset from fairml package
+
+# Continuous variables
+cont_vars <- c("Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE")  
+
+# Categorical variables
+cat_vars <- c("Gender", "family_history_with_overweight", "FAVC", "CAEC", 
+              "SMOKE", "SCC", "CALC", "MTRANS")  
+
+target_var <- "NObeyesdad"  # Target variable (obesity classification)
+
+# Subset to relevant columns
+obesity_full <- obesity.levels[, c(cont_vars, cat_vars, target_var)]
+
+# ==============================================================================
+# Introduce variable-specific MCAR: 4%, 24%, and 7% for selected variables
+# ==============================================================================
+set.seed(123)  # For reproducibility
+
+mcar_vars <- c("Gender", "FAF", "CH2O")            # Variables to introduce MCAR
+mcar_rates <- c(0.07, 0.24, 0.18)                  # Corresponding MCAR rates
+mcar_data <- obesity_full                          # Copy of original dataset
+
+# Loop through variables and introduce corresponding amount of MCAR
+for (i in seq_along(mcar_vars)) {
+  var <- mcar_vars[i]
+  rate <- mcar_rates[i]
+  
+  missing_idx <- sample(nrow(obesity_full), size = floor(rate * nrow(obesity_full)))
+  mcar_data[missing_idx, var] <- NA
+}
+
+
+# ==============================================================================
+# Apply Imputation Methods
+# ==============================================================================
+
+imputed <- list()
+
+# --- (a) Complete Case Analysis ---
+imputed$complete_case <- na.omit(mcar_data)
+
+# --- (b) Mean/Mode Imputation ---
+mean_imp <- mcar_data
+
+# Impute continuous variables with mean
+for (var in cont_vars) {
+  mean_imp[is.na(mean_imp[[var]]), var] <- mean(mean_imp[[var]], na.rm = TRUE)
+}
+
+# Impute categorical variables with mode
+for (var in cat_vars) {
+  mode_val <- names(which.max(table(mean_imp[[var]])))
+  mean_imp[is.na(mean_imp[[var]]), var] <- mode_val
+}
+
+imputed$mean_mode <- mean_imp
+
+# --- (c) Multiple Imputation using MICE ---
+mice_imp <- mice(mcar_data, m = 5, maxit = 10, printFlag = FALSE)
+imputed$mice <- lapply(1:5, function(i) complete(mice_imp, i))
+
+# ==============================================================================
+# Save Results
+# ==============================================================================
+final_results <- list(mcar = mcar_data, imputed = imputed)
+
+saveRDS(final_results, "mcar_imputation_5mice.rds", compress = "xz")
+```
+
+
+```{r}
+# ==============================================================================
+# Load Saved Imputation Results
+# ==============================================================================
+final_results <- readRDS("mcar_imputation_5mice.rds")
+
+# Access individual datasets
+mcar_data <- final_results$mcar
+mcar_complete_case <- final_results$imputed$complete_case
+mcar_mean_mode <- final_results$imputed$mean_mode
+mcar_mice <- final_results$imputed$mice
+
+# Extract individual MICE datasets
+mcar_mice_1 <- mcar_mice[[1]]
+mcar_mice_2 <- mcar_mice[[2]]
+mcar_mice_3 <- mcar_mice[[3]]
+mcar_mice_4 <- mcar_mice[[4]]
+mcar_mice_5 <- mcar_mice[[5]]
+```
+
+
+### Diagnosing MCAR: Little’s Test
+
+To evaluate whether the missingness introduced in the simulated dataset is consistent with the Missing Completely At Random (MCAR) assumption, we used Little’s MCAR test implemented in the `naniar` and `misty` R packages. Little’s test is a statistical hypothesis test that examines whether the means of variables with missing data differ significantly between observed and missing groups. The null hypothesis ($H_0$) is that the data are MCAR. The test statistic is calculated as:
+
+$$
+\chi^2 = \sum_{i=1}^{n} \frac{(O_i - E_i)^2}{E_i}
+$$
+
+Where: $O_i$ = Observed frequency and $E_i$ = Expected frequency under the MCAR assumption
+
+In our dataset, the test returned the following values:$\chi^2 = 115.28,\quad \text{df} = 107,\quad p = 0.275$. The number of unique missing data patterns was 8, and 890 out of 2111 observations had at least one missing value. Since the $p$-value is greater than 0.05, we fail to reject the null hypothesis. This suggests that the missing data mechanism is consistent with MCAR. Therefore, we can proceed with analysis methods that assume MCAR without introducing significant bias.
+
+
+```{r, results='hide'}
+# ==============================================================================
+# Diagnosing MCAR: Little’s Test
+# ==============================================================================
+# Perform Little's MCAR test using the `naniar` package
+naniar::mcar_test(mcar_data)
+
+# Perform the same test using the `misty` package for additional summary
+misty::na.test(mcar_data)
+```
+
+```{r}
+# ==============================================================================
+# Visualize MCAR Missingness Patterns
+# ==============================================================================
+
+# Heatmap of missing values
+vis_miss(mcar_data)
+
+# UpSet plot to show combinations of missingness
+gg_miss_upset(mcar_data) 
+
+# Visualize missingness across Obesity Levels
+gg_miss_fct(x = mcar_data, fct = NObeyesdad) + 
+  labs(title = "MCAR Missingness in Risk Factors and Obesity Level",
+       x = "Obesity Levels", y = "Risk Factors")
+```
+
+
+
+
+```{r}
+# ==============================================================================
+# Simulate MAR Missingness in Obesity Dataset
+# ==============================================================================
+
+set.seed(123)
+obesity_mar <- obesity_full
+
+# ==============================================================================
+# Missingness in 'FAF' (Physical Activity Frequency)
+# Based on: Age and CH2O (both fully observed)
+# ==============================================================================
+
+age_scaled <- scale(obesity_full$Age)
+ch2o_scaled <- scale(obesity_full$CH2O)
+
+lin_pred_faf <- 0.9 * age_scaled - 0.6 * ch2o_scaled  # Older age ↑ missing; more water ↓ missing
+prob_faf_miss <- plogis(lin_pred_faf) * 0.17          # Cap missingness around 17%
+missing_idx_faf <- which(runif(nrow(obesity_full)) < prob_faf_miss)
+obesity_mar[missing_idx_faf, "FAF"] <- NA
+
+# ==============================================================================
+# Missingness in 'SMOKE'
+# Based on: family_history_with_overweight and Gender
+# ==============================================================================
+
+base_prob <- 0.05
+fam_hist_effect <- ifelse(obesity_full$family_history_with_overweight == "yes", 0.04, 0)
+gender_effect_smoke <- ifelse(obesity_full$Gender == "Male", 0.08, 0)
+prob_smoke_miss <- pmin(base_prob + fam_hist_effect + gender_effect_smoke, 0.21)  # Max 21%
+
+missing_idx_smoke <- which(runif(nrow(obesity_full)) < prob_smoke_miss)
+obesity_mar[missing_idx_smoke, "SMOKE"] <- NA
+
+# ==============================================================================
+# Missingness in 'SCC' (Calorie Consumption Monitoring)
+# Based on: FAVC (frequent high-calorie food) and Gender
+# ==============================================================================
+
+base_prob <- 0.03
+favc_effect <- ifelse(obesity_full$FAVC == "yes", 0.04, 0)
+gender_effect_scc <- ifelse(obesity_full$Gender == "Male", 0.05, 0)
+prob_scc_miss <- pmin(base_prob + favc_effect + gender_effect_scc, 0.16) # Max 16%
+
+missing_idx_scc <- which(runif(nrow(obesity_full)) < prob_scc_miss)
+obesity_mar[missing_idx_scc, "SCC"] <- NA
+
+# ==============================================================================
+# Missingness in 'NCP' (Number of Main Meals)
+# Based on: Age and Gender
+# ==============================================================================
+
+gender_female <- ifelse(obesity_full$Gender == "Female", 0.2, 0)
+lin_pred_ncp <- -0.8 * age_scaled + gender_female  # Younger and female ↑ missingness
+prob_missing_ncp <- plogis(lin_pred_ncp) * 0.2     # Cap at 20%
+
+missing_idx_ncp <- which(runif(nrow(obesity_full)) < prob_missing_ncp)
+obesity_mar[missing_idx_ncp, "NCP"] <- NA
+
+# ==============================================================================
+# Apply Imputation Methods
+# ==============================================================================
+
+mar_imputed <- list()
+
+# --- (a) Complete Case Analysis ---
+mar_imputed$mar_complete_case <- na.omit(obesity_mar)
+
+# --- (b) Mean/Mode Imputation ---
+mar_mean_imp <- obesity_mar
+
+# Impute continuous variables with mean
+for (var in cont_vars) {
+  mar_mean_imp[is.na(mar_mean_imp[[var]]), var] <- mean(mar_mean_imp[[var]], na.rm = TRUE)
+}
+
+# Impute categorical variables with mode
+for (var in cat_vars) {
+  mar_mode_val <- names(which.max(table(mar_mean_imp[[var]])))
+  mar_mean_imp[is.na(mar_mean_imp[[var]]), var] <- mar_mode_val
+}
+
+mar_imputed$mar_mean_mode <- mar_mean_imp
+
+# --- (c) Multiple Imputation using MICE ---
+mar_mice_imp <- mice(obesity_mar, m = 5, maxit = 10, printFlag = FALSE)
+mar_imputed$mar_mice <- lapply(1:5, function(i) complete(mar_mice_imp, i))
+
+# ==============================================================================
+# Save Results
+# ==============================================================================
+mar_results <- list(mar = obesity_mar, imputed = mar_imputed)
+
+saveRDS(mar_results, "mar_imputation_5mice.rds", compress = "xz")
+
+# ==============================================================================
+# Load Saved Imputation Results
+# ==============================================================================
+mar_results <- readRDS("mar_imputation_5mice.rds")
+
+# Access individual datasets
+mar_data <- mar_results$mar
+mar_complete_case <- mar_results$imputed$complete_case
+mar_mean_mode <- mar_results$imputed$mar_mean_mode
+mar_mice <- mar_results$imputed$mar_mice
+
+# Extract individual MICE datasets
+mar_mice_1 <- mar_mice[[1]]
+mar_mice_2 <- mar_mice[[2]]
+mar_mice_3 <- mar_mice[[3]]
+mar_mice_4 <- mar_mice[[4]]
+mar_mice_5 <- mar_mice[[5]]
+```
+
+
+```{r}
+# ==============================================================================
+# Visualize MAR Missingness Patterns
+# ==============================================================================
+
+# Heatmap of missing values
+vis_miss(mar_data)
+
+# UpSet plot to show combinations of missingness
+gg_miss_upset(mar_data) 
+
+# Visualize missingness across Obesity Levels
+gg_miss_fct(x = mar_data, fct = NObeyesdad) + 
+  labs(title = "MAR Missingness in Risk Factors and Obesity Level",
+       x = "Obesity Levels", y = "Risk Factors")
+```
+
+
+
+
+```{r}
+# ==============================================================================
+# Simulate MNAR Missingness in Obesity Dataset
+# ==============================================================================
+
+set.seed(123)  # For reproducibility
+
+# Make a copy of the complete dataset
+obesity_mnar <- obesity_full
+
+# --- (1) SCC (Calories Monitoring) ---
+# Simulate MNAR: Missingness among those who answered "no" to SCC
+idx_scc_no <- which(obesity_mnar$SCC == "no")
+miss_scc <- sample(idx_scc_no, size = round(0.3 * length(idx_scc_no)))  # 30% of "no"
+obesity_mnar$SCC[miss_scc] <- NA
+
+# --- (2) FAF (Physical Activity Level) ---
+# Simulate MNAR: People with very low physical activity (FAF < 1)
+idx_faf_low <- which(obesity_mnar$FAF < 1)
+miss_faf <- sample(idx_faf_low, size = round(0.4 * length(idx_faf_low)))  # 40% missing
+obesity_mnar$FAF[miss_faf] <- NA
+
+# --- (3) CALC (Alcohol Consumption) ---
+# Simulate MNAR: Frequent drinkers ("Frequently") more likely to skip
+idx_calc_freq <- which(obesity_mnar$CALC == "Frequently")
+miss_calc <- sample(idx_calc_freq, size = round(0.5 * length(idx_calc_freq)))  # 50% missing
+obesity_mnar$CALC[miss_calc] <- NA
+
+# ==============================================================================
+# Apply Imputation Methods for MNAR Dataset
+# ==============================================================================
+
+mnar_imputed <- list()
+
+# --- (a) Complete Case Analysis ---
+mnar_imputed$mnar_complete_case <- na.omit(obesity_mnar)
+
+# --- (b) Mean/Mode Imputation ---
+mnar_mean_imp <- obesity_mnar
+
+# Impute continuous variables with mean
+for (var in cont_vars) {
+  mnar_mean_imp[is.na(mnar_mean_imp[[var]]), var] <- mean(mnar_mean_imp[[var]], na.rm = TRUE)
+}
+
+# Impute categorical variables with mode
+for (var in cat_vars) {
+  mnar_mode_val <- names(which.max(table(mnar_mean_imp[[var]])))
+  mnar_mean_imp[is.na(mnar_mean_imp[[var]]), var] <- mnar_mode_val
+}
+
+mnar_imputed$mnar_mean_mode <- mnar_mean_imp
+
+# --- (c) Multiple Imputation using MICE ---
+mnar_mice_imp <- mice(obesity_mnar, m = 5, maxit = 10, printFlag = FALSE)
+mnar_imputed$mnar_mice <- lapply(1:5, function(i) complete(mnar_mice_imp, i))
+
+# ==============================================================================
+# Save Results
+# ==============================================================================
+mnar_results <- list(mnar = obesity_mnar, imputed = mnar_imputed)
+
+saveRDS(mnar_results, "mnar_imputation_5mice.rds", compress = "xz")
+
+
+# ==============================================================================
+# Load Saved Imputation Results
+# ==============================================================================
+mnar_results <- readRDS("mnar_imputation_5mice.rds")
+
+# Access individual datasets
+mnar_data <- mnar_results$mnar
+mnar_complete_case <- mnar_results$imputed$mnar_complete_case
+mnar_mean_mode <- mnar_results$imputed$mnar_mean_mode
+mnar_mice <- mnar_results$imputed$mnar_mice
+
+# Extract individual MICE datasets
+mnar_mice_1 <- mnar_mice[[1]]
+mnar_mice_2 <- mnar_mice[[2]]
+mnar_mice_3 <- mnar_mice[[3]]
+mnar_mice_4 <- mnar_mice[[4]]
+mnar_mice_5 <- mnar_mice[[5]]
+
+```
+
+
+```{r}
+# ==============================================================================
+# Visualize MNAR Missingness Patterns
+# ==============================================================================
+
+# Heatmap of missing values
+vis_miss(mnar_data)
+
+# UpSet plot to show combinations of missingness
+gg_miss_upset(mnar_data) 
+
+# Visualize missingness across Obesity Levels
+gg_miss_fct(x = mnar_data, fct = NObeyesdad) + 
+  labs(title = "MNAR Missingness in Risk Factors and Obesity Level",
+       x = "Obesity Levels", y = "Risk Factors")
+```
+
+
+\newpage
+
+# Data Availabiliy
+
+All codes and datasets for this project can be found at our [GitHub Repository](https://github.com/rophenceojiambo/Simulations-Final-Project).
+
+# References
+
