@@ -1,0 +1,45 @@
+---
+title: "Evaluating Missing Data Handling Techniques Under Different Missingness Mechanisms"
+author: 
+- Rophence Ojiambo
+- Kiran Nagdeo
+- Cindy Patippe
+geometry: top=1.54cm, bottom=1.94cm, left=1.54cm, right=1.54cm
+format:
+  pdf:
+    include-in-header:
+      text: |
+        \usepackage{amsmath} 
+        \usepackage{fvextra}
+        \usepackage{pdflscape}     
+        \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+        \DefineVerbatimEnvironment{OutputCode}{Verbatim}{breaklines,commandchars=\\\{\}}
+link-citations: true
+colorlinks: true
+linkcolor: blue
+urlcolor: blue
+bibliography: references.bib
+csl: apa-numeric-superscript-brackets.csl
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,
+                      message = FALSE,
+                      warning = FALSE, 
+                      dpi = 300)
+```
+
+
+# Introduction
+
+
+
+
+\newpage
+
+# Data Availabiliy
+
+All codes and datasets for this project can be found at our [GitHub Repository](https://github.com/rophenceojiambo/Simulations-Final-Project).
+
+# References
