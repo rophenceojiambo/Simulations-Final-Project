@@ -1,6 +1,6 @@
 #  Evaluating Missing Data Handling Techniques Under Different Missingness Mechanisms
 
-![MD](MD.png)
+![MD](Analysis/MD.png)
 
 
 ## Overview
