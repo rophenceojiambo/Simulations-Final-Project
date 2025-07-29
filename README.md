@@ -13,16 +13,14 @@ properly addressed.
 
 ## Methods
 
-We applied a comprehensive approach to evaluate missing data patterns and mechanisms. Initial exploratory analyses included quantifying the extent and distribution of missingness across variables. We assessed whether data were missing completely at random (MCAR), missing at random (MAR), or missing not at random (MNAR) using statistical tests such as Little’s MCAR test and visualizations like missingness maps. Sensitivity analyses and multiple imputation techniques were employed to handle missing data and evaluate the robustness of study findings under different assumptions.
-
+We used the UCI Obesity dataset, which originally contained no missing values, to explore the distribution of key predictors related to obesity. To evaluate missing data handling methods, we introduced artificial missingness under three mechanisms: Missing Completely at Random (MCAR), Missing at Random (MAR), and Missing Not at Random (MNAR). We formally tested the MCAR condition using Little’s MCAR test on the simulated MCAR dataset. For MAR and MNAR, formal testing was not feasible; instead, we visualized the missing data patterns to assess structure and plausibility. Multiple imputation techniques were applied to each simulated dataset to address missingness. Model performance was then evaluated across all scenarios — including the original complete dataset — to assess the impact of missing data and the effectiveness of imputation.
 
 ## Key Insights
 
+Multiple imputation (MICE) consistently performed best across all missingness mechanisms, recovering accuracy and minimizing bias.
 
-Missingness varied substantially across key variables, highlighting potential bias if ignored.
+Complete case analysis performed reasonably well under MAR but led to biased estimates and data loss under MCAR and MNAR.
 
-Evidence suggested that missing data were not completely random, necessitating appropriate handling methods.
+Mean/Mode imputation, while simple, was notably less effective — particularly under MNAR.
 
-Multiple imputation improved data completeness and reduced bias compared to complete-case analysis.
-
-Sensitivity analyses underscored the importance of modeling missingness mechanisms to ensure valid inferences in epidemiological studies.
+These results underscore that careful selection of imputation methods is critical, especially when missingness may not be MCAR
