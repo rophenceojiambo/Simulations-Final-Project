@@ -13,7 +13,15 @@ properly addressed.
 
 ## Methods
 
-We used the UCI Obesity dataset, which originally contained no missing values, to explore the distribution of key predictors related to obesity. To evaluate missing data handling methods, we introduced artificial missingness under three mechanisms: Missing Completely at Random (MCAR), Missing at Random (MAR), and Missing Not at Random (MNAR). We formally tested the MCAR condition using Little’s MCAR test on the simulated MCAR dataset. For MAR and MNAR, formal testing was not feasible; instead, we visualized the missing data patterns to assess structure and plausibility. Multiple imputation techniques were applied to each simulated dataset to address missingness. Model performance was then evaluated across all scenarios — including the original complete dataset — to assess the impact of missing data and the effectiveness of imputation.
+We used the UCI Obesity dataset, which originally contained no missing values, to explore the distribution of key predictors related to obesity. To evaluate missing data handling methods, we introduced artificial missingness under three mechanisms: Missing Completely at Random (MCAR), Missing at Random (MAR), and Missing Not at Random (MNAR). We formally tested the MCAR condition using Little’s MCAR test on the simulated MCAR dataset. For MAR and MNAR, formal testing was not feasible; instead, we visualized the missing data patterns to assess structure and plausibility. Multiple imputation techniques were applied to each simulated dataset to address missingness. Three imputation approaches were applied to each simulated dataset:
+
+Multiple Imputation by Chained Equations (MICE)
+
+Complete Case Analysis
+
+Mean/Mode Imputation
+
+Model performance was evaluated across all simulated datasets — as well as the original complete dataset — to assess how each method performed under different missingness conditions.
 
 ## Key Insights
 
