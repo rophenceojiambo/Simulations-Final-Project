@@ -5,6 +5,7 @@ author:
 - Kiran Nagdeo
 - Cindy Patippe
 geometry: top=1.54cm, bottom=1.94cm, left=1.54cm, right=1.54cm
+fontsize: 10pt
 format:
   pdf:
     include-in-header:
@@ -46,8 +47,6 @@ Obesity presents a growing public health challenge worldwide, contributing to in
 
 The objective of this project is to conduct a simulation study using the [UCI Obesity](https://archive.ics.uci.edu/dataset/544/estimation+of+obesity+levels+based+on+eating+habits+and+physical+condition) dataset to assess how various imputation techniques perform under MCAR, MAR, and MNAR scenarios.
 
-\newpage
-
 
 # Methods
 
@@ -67,15 +66,13 @@ We applied three common strategies to handle missing data; (1) Complete Case Ana
 
 We trained logistic regression models to predict `Obesity` across all datasets (Original, MCAR, MAR, MNAR) and imputation methods. Each dataset was split into training (70%) and test (30%) sets using stratified sampling to preserve the outcome distribution. Model performance was evaluated using the following metrics: **Accuracy:** Proportion of correct classifications; **Sensitivity (Recall):** Proportion of obese individuals correctly identified; **Specificity:** Proportion of non-obese individuals correctly identified; **Area Under the ROC Curve (AUC):** Discriminative ability of the model; **F1 Score:** Harmonic mean of precision and recall. Model metrics were computed separately for the training and test sets. For MICE, pooled predictions across imputations were used for test metrics, and average metrics were reported for training.
 
-
-\newpage
-
 # Results
 
 
 ### Exploratory Data Analysis
 
-We conducted exploratory analysis to examine predictor distributions and associations by obesity status. The outcome was moderately balanced (54% Not Obese, 46% Obese). A correlation plot revealed notable differences by class; for example, `Age` and `TUE` were negatively correlated (r = –0.297 overall), more so among obese participants. Relationships between `FCVC` and `NCP` also varied across groups.
+We conducted exploratory analysis to examine predictor distributions and associations by obesity status. The outcome was moderately balanced (54% Not Obese, 46% Obese). A correlation plot revealed notable differences by class; for example, `Age` and `TUE` were negatively correlated (r = –0.297 overall), more so among obese participants. Relationships between `FCVC` and `NCP` also varied across groups, see Figure 1. We used Little’s MCAR test (`naniar`, `misty`) to assess missingness in the simulated dataset. Results ($\chi^2 = 103.68$, df = 93, $p = 0.211$) suggest the data was consistent with MCAR. There were 8 unique missing patterns, with 1031 of 2111 cases missing at least one value. Formal tests for MAR or MNAR were not possible; distinguishing these mechanisms requires unverifiable assumptions or external data. Missingness patterns are shown in Figure 2. For example, we can see that under MCAR, missing values are evenly distributed and show no dependency on obesity status. Recognizing these patterns is key because they guide the assumptions behind imputation models and influence their effectiveness.
+
 
 ```{r}
 # ==============================================================================
@@ -170,7 +167,7 @@ ggsave("Analysis/pairs_plot.png", width = 10, height = 8)
 knitr::include_graphics("Analysis/pairs_plot.png")
 ```
 
-We used Little’s MCAR test (`naniar`, `misty`) to assess missingness in the simulated dataset. Results ($\chi^2 = 103.68$, df = 93, $p = 0.211$) suggest the data was consistent with MCAR. There were 8 unique missing patterns, with 1031 of 2111 cases missing at least one value. Formal tests for MAR or MNAR were not possible; distinguishing these mechanisms requires unverifiable assumptions or external data. Missingness patterns are shown in the figure 2 below.
+
 
 
 ```{r}
@@ -709,7 +706,10 @@ test_table <- test_table %>%
 
 ### Training Set Performance
 
-On the original full dataset without missing values, the model achieved an accuracy of 77.5%, sensitivity of 86.6%, specificity of 69.7%, and an AUC of 0.8683. Under MCAR conditions, model performance varied only slightly across imputation methods. Multiple imputation produced results comparable to the original dataset (accuracy = 77.5%, AUC = 0.8705), whereas complete case analysis and mean/mode imputation led to modest reductions in performance metrics. Notably, analysis with simulated data under MCAR yielded an accuracy of 76.3% and an AUC of 0.8642, see Table 1.
+In the training data, the logistic regression model trained on the complete original dataset without missing values achieved an accuracy of approximately 77.5%, with sensitivity around 86.6% and specificity near 69.7%. The Area Under the ROC Curve (AUC) was 0.8683, indicating good discriminative ability. Under the MCAR missingness scenario, multiple imputation via MICE performed nearly identically to the full data model, with an accuracy of 77.5% and AUC of 0.8705. This confirms MICE’s strength in handling completely randomly missing data.
+Complete case analysis and mean/mode imputation, while simpler, showed modest reductions in accuracy, falling to about 76.5% and 76.9% respectively, with slightly lower specificity. Notably, analysis with simulated missing data under MCAR yielded an accuracy of 76.3% and an AUC of 0.8642, see Table 1.
+
+
 
 
 
@@ -735,12 +735,14 @@ training_table %>%
 
 ```
 
-In the MAR scenario, performance was more variable. Mean/mode imputation and multiple imputation yielded high sensitivity (0.8678 and 0.8658, respectively), but complete case analysis achieved the highest accuracy (80.8%) and AUC (0.8871). This may be due to selective retention of more informative observations in the complete-case subset under the MAR mechanism. Multiple imputation again demonstrated strong overall performance with a balance of sensitivity and specificity. For the MNAR scenario, overall performance was lower compared to MCAR and MAR, as expected given the unidentifiability of the missing data mechanism without further assumptions. Multiple imputation consistently outperformed the other methods, closely matching the original dataset's accuracy and AUC. Mean/Mode Imputation under MNAR led to the lowest AUC (0.8660) among the imputation methods and lowest specificity (0.6905), see Table 1 above.
+In the MAR scenario, performance was more variable. Mean/mode imputation and multiple imputation yielded high sensitivity (0.8678 and 0.8658, respectively), but complete case analysis achieved the highest accuracy (80.8%) and AUC (0.8871). This may be due to selective retention of more informative observations in the complete-case subset under the MAR mechanism, though at the cost of discarding a large portion of the data. Multiple imputation again demonstrated strong overall performance with a balance of sensitivity and specificity. However,even MICE did not achieve optimal performance metrics as those in the original dataset. For the MNAR scenario, overall performance of all methods was biased and lower compared to MCAR and MAR, as expected given the unidentifiability of the missing data mechanism without further assumptions. Again, multiple imputation consistently outperformed the other methods, closely matching the original dataset's accuracy and AUC. Mean/Mode Imputation under MNAR led to the lowest AUC (0.8660) among the imputation methods and lowest specificity (0.6905), see Table 1 above.
+
 
 
 ### Test Set Performance
 
-Similar trends were observed in the test set evaluations. Under MCAR, the highest sensitivity (90.7%) was observed in the simulated dataset with missingness. Multiple imputation again yielded performance close to the original data (accuracy = 77.7%, AUC = 0.8736), while complete case analysis showed a slight increase in the AUC (0.8924)estimate, see Table 2 below. Under MAR, mean/mode imputation achieved the accuracy (77.7%)  slightly above the original estimate and competitive AUC (0.8711), albeit at the cost of lower specificity. Multiple imputation led to a balanced trade-off across all metrics. In the MNAR setting, performance was generally lower. The simulated incomplete data yielded an AUC of 0.8649, but this dropped to 0.8404 under complete-case analysis. Nonetheless, MICE showed the most stable performance across all metrics and missingness mechanisms, including MNAR, with an F1 Score of 0.7861 and accuracy of 78.6%.
+Similar trends were observed in the test set evaluations. The full dataset model had an accuracy of about 77.5%, with a sensitivity of 83.9% and specificity of 72.1%, and an AUC of 0.8717. Under MCAR, the highest sensitivity (90.7%) was observed in the simulated dataset with missingness. Multiple imputation again yielded performance close to the original data (accuracy = 77.7%, AUC = 0.8736), while complete case analysis showed a marginally higher AUC of 0.8924 but lower specificity at 68.2%, see Table 2 below. Under MAR scenario, mean/mode imputation achieved the accuracy (77.7%)  slightly above the original estimate and competitive AUC (0.8711), albeit at the cost of lower specificity. Multiple imputation led to a balanced trade-off across all metrics. In the MNAR setting, performance was generally lower. The simulated incomplete data yielded an AUC of 0.8649, but this dropped to 0.8404 under complete-case analysis. Nonetheless, MICE showed the most stable performance across all metrics and missingness mechanisms, including MNAR, with an F1 Score of 0.7861 and accuracy of 78.6%.
+
 
 
 ```{r}
@@ -773,9 +775,12 @@ test_table %>%
 
 
 
-# Conclusion
+# Discussion
 
-Multiple imputation (MICE) showed the most consistent performance across all missingness mechanisms. Complete case analysis performed well under MAR but led to bias and data loss under MCAR and MNAR. Mean/mode imputation was simple but less effective. These findings highlight the need for principled approaches when missingness may not be MCAR.
+
+This study provides evaluated the relative performance of complete case analysis, mean/mode imputation, and multiple imputation under various missingness mechanisms (MCAR, MAR, MNAR) using an obesity dataset. Under MCAR, where the assumption of random missingness holds, all methods performed relatively well, with MICE and complete case analysis showing comparable performance to the original complete dataset. However, mean/mode imputation slightly underperformed, consistent with literature highlighting its limitations in preserving variable relationships and variance structure [@schafer2002missing; @donders2006gentle]. The minor performance drop for MCAR conditions reinforces the idea that missing completely at random is the least problematic mechanism from an inferential standpoint. In contrast, the MAR scenario revealed stronger differences among imputation strategies. Complete case analysis unexpectedly achieved the highest training set accuracy and AUC, potentially due to bias induced by selective retention of more informative observations. However, this did not translate to the test set, where multiple imputation yielded the most stable and balanced performance. These findings align with the principle that while MAR is ignorable under the correct model specification, complete case analysis introduces selection bias unless missingness is independent of the outcome conditional on covariates [@carpenter2023multiple]. MNAR posed the greatest challenge across all metrics. As anticipated, performance was degraded relative to MCAR and MAR, and no method fully recovered the performance observed in the original data. Nevertheless, MICE consistently outperformed the other two methods. While MICE assumes MAR, its iterative modeling of multivariate dependencies may provide some robustness to modest violations of this assumption. In contrast, mean/mode imputation exhibited the poorest discrimination and specificity, especially under MNAR conditions, emphasizing its inadequacy when missingness depends on unobserved data.
+
+Notably, sensitivity was generally higher in the simulated datasets with missingness than in the imputed datasets. This may reflect overfitting or spurious signals introduced by biased missingness mechanisms. The consistently high sensitivity of MICE across all scenarios suggests its superior capacity to recover true positive cases, a crucial consideration in obesity risk prediction. In sum, multiple imputation emerged as the most reliable and consistent technique across all missing data scenarios, even in the presence of MNAR. While no method can fully correct for non-ignorable missingness without additional assumptions or auxiliary information, MICE provided a robust balance between sensitivity, specificity, and overall classification performance. Complete case analysis should be approached with caution, particularly under MAR or MNAR, where it may yield misleading estimates. Mean/mode imputation, although computationally simple, performed worst and is not recommended when accurate model inference or prediction is the goal. Future work should consider incorporating sensitivity analyses to explicitly model MNAR processes (e.g., selection models, pattern mixture models), use external validation datasets, and expand simulations to include nonlinear models or high-dimensional settings. These steps can enhance generalizability and inform missing data strategies in real-world epidemiological applications where complete information is rarely available.
 
 
 \newpage
